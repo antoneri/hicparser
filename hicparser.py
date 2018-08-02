@@ -8,7 +8,7 @@ Cell Systems, Volume 3, Issue 1, p. 95-98
 import zlib
 from argparse import ArgumentParser, ArgumentTypeError, FileType
 from array import array
-from collections import namedtuple
+from collections import Iterable, namedtuple
 from enum import Enum
 from functools import lru_cache
 from struct import unpack, unpack_from, Struct
@@ -49,16 +49,13 @@ class NormType(Enum):
     KR = "KR"
 
 
-class BlockReader:
-    """The BlockReader is an iterable that decompresses block data on the fly
+class BlockReader(Iterable):
+    """The BlockReader is an abstract Iterable that decompresses block data on the fly
     which allows for huge files to be read.
 
-    This class is not supposed to be used directly, it is supposed to be instantiated
+    This class is not supposed to be used directly, its subclasses are supposed to be instantiated
     by the HicParser.
-
-    For hic version 7 and greater.
     """
-    __struct_hh = Struct("<hh")
 
     def __init__(self, file, unit, bin_size, bin_count, column_count, blocks):
         """Initialize a BlockReader
@@ -84,6 +81,58 @@ class BlockReader:
         self.bin_count = bin_count
         self.column_count = column_count
         self.blocks = blocks
+
+    @classmethod
+    def get(cls, version):
+        """Get BlockReader for given version.
+
+        Parameters
+        ----------
+        version : int
+            hic format version
+
+        Returns
+        -------
+        BlockReader subclass
+
+        """
+        block_reader = None
+        if version == 6:
+            block_reader = BlockReaderV6
+        elif version >= 7:
+            block_reader = BlockReaderV7plus
+        return block_reader
+
+    @classmethod
+    def create(cls, version, params):
+        """Create BlockReader for given version.
+
+        Parameters
+        ----------
+        version : int
+            hic format version
+        params
+            arguments passed to the BlockReader
+
+        Returns
+        -------
+        BlockReader subclass instance
+
+        """
+        block_reader = cls.get(version)
+
+        try:
+            return block_reader(params)
+        except TypeError:
+            raise NotImplementedError("No BlockReader available for version {}".format(version))
+
+
+class BlockReaderV7plus(BlockReader):
+    """Specialized version of BlockReader for hic version 7 and greater.
+
+    """
+
+    __struct_hh = Struct("<hh")
 
     def __iter__(self):
         """Generator which yields all block data.
@@ -317,7 +366,7 @@ class HicParser:
         chr1_idx, chr2_idx, n_resolutions = unpack("<3i", file.read(12))
 
         block_readers = []
-        block_reader = BlockReaderV6 if self.version < 7 else BlockReader
+        block_reader = BlockReader.get(self.version)
 
         for _ in range(n_resolutions):
             unit = Unit(_read_string(file))
