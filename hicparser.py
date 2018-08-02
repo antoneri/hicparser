@@ -82,6 +82,13 @@ class BlockReader(Iterable):
         self.column_count = column_count
         self.blocks = blocks
 
+    @property
+    def decompress(self):
+        for __, position, size in self.blocks:
+            self.file.seek(position)
+            compressed = self.file.read(size)
+            yield zlib.decompress(compressed)
+
     @classmethod
     def get(cls, version):
         """Get BlockReader for given version.
@@ -127,6 +134,26 @@ class BlockReader(Iterable):
             raise NotImplementedError("No BlockReader available for version {}".format(version))
 
 
+class BlockReaderV6(BlockReader):
+    """Specialized version of BlockReader for hic version 6.
+
+    """
+
+    def __iter__(self):
+        """Generator which yields all block data.
+
+        Yields
+        ------
+        int, int, float
+            bin_x, bin_y, count
+        """
+        for data in self.decompress:
+            n_values = unpack_from("<i", data)[0]
+            values = unpack_from("<{}".format("iif" * n_values), data, 4)  # x, y, count, x, y, count, ...
+            for bin_x, bin_y, count in zip(*[iter(values)] * 3):
+                yield bin_x, bin_y, count
+
+
 class BlockReaderV7plus(BlockReader):
     """Specialized version of BlockReader for hic version 7 and greater.
 
@@ -139,14 +166,10 @@ class BlockReaderV7plus(BlockReader):
 
         Yields
         ------
-        int, int, int
+        int, int, float
             bin_x, bin_y, count
         """
-        for __, position, size in self.blocks:
-            self.file.seek(position)
-            compressed = self.file.read(size)
-            data = zlib.decompress(compressed)
-
+        for data in self.decompress:
             bin_x_offset, bin_y_offset, use_float, block_type = unpack_from("<ii?b", data, 4)
             offset = 14
 
@@ -181,28 +204,8 @@ class BlockReaderV7plus(BlockReader):
                         offset += 2
                     yield bin_x_offset + col, bin_y_offset + row, count
 
-
-class BlockReaderV6(BlockReader):
-    """Specialized version of BlockReader for hic version 6.
-
-    """
-
-    def __iter__(self):
-        """Generator which yields all block data.
-
-        Yields
-        ------
-        int, int, float
-            bin_x, bin_y, count
-        """
-        for __, position, size in self.blocks:
-            self.file.seek(position)
-            compressed = self.file.read(size)
-            data = zlib.decompress(compressed)
-            n_values = unpack_from("<i", data)[0]
-            values = unpack_from("<{}".format("iif" * n_values), data, 4)  # x, y, count, x, y, count, ...
-            for bin_x, bin_y, count in zip(*[iter(values)] * 3):
-                yield bin_x, bin_y, count
+            else:
+                raise NotImplementedError("Unknown block type {} encountered".format(block_type))
 
 
 class HicParser:
