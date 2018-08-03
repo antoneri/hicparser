@@ -277,7 +277,7 @@ class HicParser:
         self.version = _read_int(file)
 
         if self.version < 6:
-            raise Exception("Version {} no longer supported".format(self.version))
+            raise Exception("Version {} not supported".format(self.version))
 
         master_index_pos = unpack("<q", file.read(8))[0]
 
