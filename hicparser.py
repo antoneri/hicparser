@@ -8,7 +8,11 @@ Cell Systems, Volume 3, Issue 1, p. 95-98
 import zlib
 from argparse import ArgumentParser, ArgumentTypeError, FileType
 from array import array
-from collections import Iterable, namedtuple
+from collections import namedtuple
+try:
+    from collections.abc import Iterable
+except ImportError:
+    from collections import Iterable
 from enum import Enum
 from functools import lru_cache
 from struct import unpack, unpack_from, Struct
