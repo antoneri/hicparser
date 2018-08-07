@@ -414,13 +414,13 @@ class HicParser:
 
         Examples
         --------
-        >>> hic = HicParser(f)  # f: file object
+        >>> f = open("somefile.hic", "rb")
+        >>> hic = HicParser(f)
         >>> c1, c2, res = "X", "Y", 5000
         >>> c1_norm = hic.norm_vector(c1, NormType.VC, res)
         >>> c2_norm = hic.norm_vector(c2, NormType.VC, res)
         >>> record = hic.record(c1, c2)
-        >>> blocks = hic.blocks(record, res)
-        >>> for bin_x, bin_y, count in blocks:
+        >>> for bin_x, bin_y, count in hic.blocks(record, res):
         >>>     print(count / (c1_norm[bin_x] * c2_norm[bin_y]))  # print normalized count
         """
         index = self.chromosome_index[chromosome]
@@ -450,7 +450,7 @@ class HicParser:
 
         Returns
         -------
-        int
+        dict of str to int
             chromosome index
         """
         return {name: index for name, (__, index) in self.chromosomes.items()}
@@ -461,7 +461,7 @@ class HicParser:
 
         Returns
         -------
-        str
+        dict of int to str
             chromosome name
         """
         return {index: name for name, (__, index) in self.chromosomes.items()}
@@ -476,7 +476,7 @@ class HicParser:
 
         Returns
         -------
-        tuple of str, str
+        str, str
             Two chromosome names
 
         Raises
@@ -542,6 +542,7 @@ class HicParser:
 
         Examples
         --------
+        >>> f = open("somefile.hic", "rb")
         >>> hic = HicParser(f)  # f: file object
         >>> record = hic.record("X", "Y")
         >>> blocks = hic.blocks(record, 5000)
