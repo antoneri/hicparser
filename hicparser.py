@@ -301,6 +301,8 @@ class HicParser:
             chr_length = _read_int(file)
             self.chromosomes[chr_name] = Chromosome(chr_length, index)
 
+        self.chromosome_name = {index: name for name, (__, index) in self.chromosomes.items()}
+
         n_bp_resolutions = _read_int(file)
         self.bp_resolutions = array("i", file.read(4 * n_bp_resolutions))
 
@@ -427,7 +429,7 @@ class HicParser:
         >>> for bin_x, bin_y, count in hic.blocks(record, res):
         >>>     print(count / (c1_norm[bin_x] * c2_norm[bin_y]))  # print normalized count
         """
-        index = self.chromosome_index[chromosome]
+        index = self.chromosomes[chromosome].index
         norm = self._get_norm_vector(index, norm_type, bin_size, unit)
         return self._read_norm_vector(norm.position)
 
@@ -447,28 +449,6 @@ class HicParser:
         self.file.seek(position)
         n_values = _read_int(self.file)
         return array("d", self.file.read(8 * n_values))
-
-    @property
-    def chromosome_index(self):
-        """Chromosome index by name
-
-        Returns
-        -------
-        dict of str to int
-            chromosome index
-        """
-        return {name: index for name, (__, index) in self.chromosomes.items()}
-
-    @property
-    def chromosome_name(self):
-        """Chromosome name by index
-
-        Returns
-        -------
-        dict of int to str
-            chromosome name
-        """
-        return {index: name for name, (__, index) in self.chromosomes.items()}
 
     def chromosome_names(self, record_key):
         """Get chromosome names from record key
@@ -515,7 +495,7 @@ class HicParser:
         LookupError
             If no record was found for the chromosome pair.
         """
-        index1, index2 = sorted((self.chromosome_index[chromosome1], self.chromosome_index[chromosome2]))
+        index1, index2 = sorted((self.chromosomes[chromosome1].index, self.chromosomes[chromosome2].index))
         key = "{}_{}".format(index1, index2)
 
         try:
