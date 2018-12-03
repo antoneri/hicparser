@@ -9,6 +9,7 @@ import zlib
 from argparse import ArgumentParser, ArgumentTypeError, FileType
 from array import array
 from collections import namedtuple
+
 try:
     from collections.abc import Iterable
 except ImportError:
@@ -40,6 +41,7 @@ ScaleFactor = namedtuple("ScaleFactor", "index scale_factor")
 ExpectedValue = namedtuple("ExpectedValue", "bin_size unit values scale_factors")
 NormExpectedValue = namedtuple("NormExpectedValue", "type bin_size unit values scale_factors")
 NormVector = namedtuple("NormVector", "type index unit bin_size position n_bytes")
+Range = namedtuple("Range", "start stop")
 
 
 class Unit(Enum):
@@ -540,6 +542,63 @@ class HicParser:
         except StopIteration:
             raise LookupError(
                 "No block header found for unit {}, bin size {}".format(unit.name, bin_size))
+
+    def values(self, chromosome1, chromosome2, bin_size, unit=Unit.BP, norm_type=None, range1=None, range2=None):
+        """Get all values for chromosome pair.
+
+        Parameters
+        ----------
+        chromosome1 : str
+            chromosome name
+        chromosome2 : str
+            chromosome name
+        bin_size : int
+            the bin size
+        unit : Unit, optional
+            resolution unit
+        norm_type : NormType, optional
+        range1 : Range, optional
+            the range of indices to get for chromosome1
+        range2 : Range, optional
+            the range of indices to get for chromosome2
+
+        Yields
+        ------
+        int, int, float
+            x, y, count
+
+        """
+        record = self.record(chromosome1, chromosome2)
+
+        norm1 = norm2 = None
+
+        if norm_type:
+            norm1 = self.norm_vector(chromosome1, norm_type, bin_size, unit)
+            norm2 = self.norm_vector(chromosome2, norm_type, bin_size, unit)
+
+        index1, index2 = self.chromosomes[chromosome1].index, self.chromosomes[chromosome2].index
+
+        if index1 > index2:
+            range1, range2 = range2, range1
+
+        intra = chromosome1 == chromosome2
+        if intra:
+            range1, range2 = range2, range1
+
+        for bin_x, bin_y, count in self.blocks(record, bin_size, unit):
+            x = bin_x * bin_size
+            y = bin_y * bin_size
+            if norm_type:
+                norm = norm1[bin_x] * norm2[bin_y]
+                if abs(norm) < 1e-16:
+                    count = float("inf")
+                else:
+                    count /= norm
+            if range1 and range2:
+                if range1.start <= x <= range1.stop and range2.start <= y <= range2.stop:
+                    yield x, y, count
+            else:
+                yield x, y, count
 
 
 class HicFileType(FileType):
